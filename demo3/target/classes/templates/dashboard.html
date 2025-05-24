@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Админ-панель клиентов</title>
+  <style>
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #999; padding: 8px; text-align: left; }
+    input, button { margin: 5px 0; padding: 6px; }
+    button { cursor: pointer; }
+  </style>
+</head>
+<body>
+<h1>Клиенты</h1>
+
+<form id="addClientForm">
+  <input type="text" id="fullName" placeholder="ФИО" required />
+  <input type="text" id="phone" placeholder="Телефон" required />
+  <button type="submit">Добавить</button>
+</form>
+
+<h2>Бронирования</h2>
+
+<form id="addBookingForm">
+  <input type="number" id="clientId" placeholder="ID клиента" required />
+  <input type="number" id="roomId" placeholder="ID комнаты" required />
+  <input type="date" id="startDate" required />
+  <input type="date" id="endDate" required />
+  <button type="submit">Добавить бронирование</button>
+</form>
+
+<table id="bookingsTable">
+  <thead>
+  <tr>
+    <th>ID</th><th>Клиент</th><th>Комната</th>
+    <th>Начало</th><th>Конец</th><th>Действия</th>
+  </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+
+<table id="clientsTable">
+  <thead>
+  <tr><th>ID</th><th>ФИО</th><th>Телефон</th><th>Действия</th></tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script>
+  const bookingsAPI = "/api/bookings";
+
+  async function loadBookings() {
+    const res = await fetch(bookingsAPI);
+    const data = await res.json();
+    const tbody = document.querySelector('#bookingsTable tbody');
+    tbody.innerHTML = '';
+
+    data.forEach(b => {
+      tbody.innerHTML += `
+                <tr>
+                    <td>${b.id}</td>
+                    <td contenteditable data-field="clientId" data-id="${b.id}">${b.client?.id || ''}</td>
+                    <td contenteditable data-field="roomId" data-id="${b.id}">${b.room?.id || ''}</td>
+                    <td contenteditable data-field="startDate" data-id="${b.id}">${b.startDate}</td>
+                    <td contenteditable data-field="endDate" data-id="${b.id}">${b.endDate}</td>
+                    <td>
+                        <button onclick="updateBooking(${b.id})">Сохранить</button>
+                        <button onclick="deleteBooking(${b.id})">Удалить</button>
+                    </td>
+                </tr>
+            `;
+    });
+  }
+
+  document.getElementById('addBookingForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const booking = {
+      client: { id: parseInt(document.getElementById('clientId').value) },
+      room: { id: parseInt(document.getElementById('roomId').value) },
+      startDate: document.getElementById('startDate').value,
+      endDate: document.getElementById('endDate').value
+    };
+
+    const res = await fetch(bookingsAPI, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(booking)
+    });
+
+    if (res.ok) {
+      document.getElementById('addBookingForm').reset();
+      loadBookings();
+    }
+  });
+
+  async function updateBooking(id) {
+    const clientId = document.querySelector(`td[data-id="${id}"][data-field="clientId"]`).innerText.trim();
+    const roomId = document.querySelector(`td[data-id="${id}"][data-field="roomId"]`).innerText.trim();
+    const startDate = document.querySelector(`td[data-id="${id}"][data-field="startDate"]`).innerText.trim();
+    const endDate = document.querySelector(`td[data-id="${id}"][data-field="endDate"]`).innerText.trim();
+
+    const booking = {
+      client: { id: parseInt(clientId) },
+      room: { id: parseInt(roomId) },
+      startDate,
+      endDate
+    };
+
+    const res = await fetch(`${bookingsAPI}/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(booking)
+    });
+
+    if (res.ok) loadBookings();
+  }
+
+  async function deleteBooking(id) {
+    if (!confirm('Удалить бронирование?')) return;
+    const res = await fetch(`${bookingsAPI}/${id}`, { method: 'DELETE' });
+    if (res.ok) loadBookings();
+  }
+
+  // Запуск при загрузке
+  loadBookings();
+</script>
+
+
+<script>
+  const API = '/api/clients';
+
+  async function loadClients() {
+    const res = await fetch(API);
+    const clients = await res.json();
+    const tbody = document.querySelector('#clientsTable tbody');
+    tbody.innerHTML = '';
+    clients.forEach(c => {
+      tbody.innerHTML += `
+                    <tr>
+                        <td>${c.id}</td>
+                        <td contenteditable="true" data-field="fullName" data-id="${c.id}">${c.fullName}</td>
+                        <td contenteditable="true" data-field="phone" data-id="${c.id}">${c.phone}</td>
+                        <td>
+                            <button onclick="updateClient(${c.id})">Сохранить</button>
+                            <button onclick="deleteClient(${c.id})">Удалить</button>
+                        </td>
+                    </tr>
+                `;
+    });
+  }
+
+  document.getElementById('addClientForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const fullName = document.getElementById('fullName').value;
+    const phone = document.getElementById('phone').value;
+
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ fullName, phone })
+    });
+
+    if (res.ok) {
+      document.getElementById('fullName').value = '';
+      document.getElementById('phone').value = '';
+      loadClients();
+    }
+  });
+
+  async function updateClient(id) {
+    const nameCell = document.querySelector(`td[data-id="${id}"][data-field="fullName"]`);
+    const phoneCell = document.querySelector(`td[data-id="${id}"][data-field="phone"]`);
+
+    const res = await fetch(`${API}/${id}`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        fullName: nameCell.innerText.trim(),
+        phone: phoneCell.innerText.trim()
+      })
+    });
+
+    if (res.ok) {
+      alert('Обновлено');
+      loadClients();
+    }
+  }
+
+  async function deleteClient(id) {
+    if (!confirm('Удалить клиента?')) return;
+    const res = await fetch(`${API}/${id}`, { method: 'DELETE' });
+    if (res.ok) loadClients();
+  }
+
+  loadClients();
+</script>
+</body>
+</html>
